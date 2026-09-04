@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>STRAIT</title>
+<style>
+  :root{
+    --bg:#07090c;--panel:#0d1116;--edge:#1b232c;--ink:#e6edf3;--dim:#6b7c8d;
+    --live:#3fd18b;--dead:#f0525f;--warn:#c8a24a;--wire:#2a3541;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink)}
+  body{font:400 15px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;
+    padding:env(safe-area-inset-top) 14px calc(28px + env(safe-area-inset-bottom));
+    max-width:560px;margin:0 auto}
+  header{display:flex;align-items:baseline;justify-content:space-between;padding:18px 0 4px}
+  .mark{font-size:13px;letter-spacing:.34em;color:var(--dim)}
+  .sub{font-size:11px;color:var(--dim);padding-bottom:18px}
+
+  .edge{border:1px solid var(--edge);border-radius:5px;background:var(--panel);
+    padding:20px;text-align:center;position:relative;overflow:hidden}
+  .edge::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--tone,var(--dead))}
+  .edge .n{font-size:38px;font-weight:600;letter-spacing:-.02em;color:var(--tone,var(--dead));line-height:1}
+  .edge .u{font-size:15px;color:var(--dim);margin-left:5px}
+  .edge .route{margin-top:9px;font-size:13px;color:var(--dim)}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .venue{border:1px solid var(--edge);border-radius:5px;background:var(--panel);padding:14px}
+  .venue h3{margin:0 0 3px;font-size:12px;font-weight:400;color:var(--dim);letter-spacing:.06em}
+  .venue .inst{font-size:10px;color:var(--wire);margin-bottom:9px}
+  .venue .mid{font-size:20px;font-weight:600;letter-spacing:-.01em}
+  .venue dl{margin:8px 0 0;font-size:11px;color:var(--dim);display:grid;grid-template-columns:auto 1fr;gap:2px 8px}
+  .venue dd{margin:0;text-align:right;color:var(--ink)}
+  .venue dt{margin:0}
+
+  .rows{margin-top:12px;border:1px solid var(--edge);border-radius:5px;background:var(--panel)}
+  .row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    padding:14px 16px;border-bottom:1px solid var(--edge)}
+  .row:last-child{border-bottom:0}
+  .row .k{font-size:13px}
+  .row .d{font-size:11px;color:var(--dim);margin-top:3px}
+  .row .v{font-size:14px;text-align:right;white-space:nowrap}
+  .pos{color:var(--live)}.neg{color:var(--dead)}.neu{color:var(--warn)}
+
+  .fees{margin-top:12px;border:1px solid var(--edge);border-radius:5px;background:var(--panel);padding:14px 16px}
+  .fees label{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px;color:var(--dim);padding:5px 0}
+  .fees input{background:#121820;border:1px solid var(--edge);color:var(--ink);
+    font:inherit;font-size:13px;width:88px;padding:5px 8px;border-radius:3px;text-align:right}
+  .fees input:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+
+  footer{display:flex;justify-content:space-between;margin-top:16px;font-size:11px;color:var(--dim)}
+  .err{margin-top:12px;padding:12px 14px;border:1px solid var(--dead);border-radius:5px;font-size:13px;color:var(--dead)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="mark">STRAIT</div>
+  <div class="sub" id="clock">—</div>
+</header>
+<div class="sub">Bybit BTCUSDT.P vs Crypto.com BTCUSD-PERP · net of taker fees</div>
+
+<div class="edge" id="edge">
+  <div><span class="n" id="net">—</span><span class="u">bps</span></div>
+  <div class="route" id="route">measuring</div>
+</div>
+
+<div class="grid">
+  <div class="venue">
+    <h3>Bybit</h3><div class="inst">BTCUSDT · USDT settled</div>
+    <div class="mid" id="by-mid">—</div>
+    <dl>
+      <dt>bid</dt><dd id="by-bid">—</dd>
+      <dt>ask</dt><dd id="by-ask">—</dd>
+      <dt>funding</dt><dd id="by-fund">—</dd>
+    </dl>
+  </div>
+  <div class="venue">
+    <h3>Crypto.com</h3><div class="inst">BTCUSD-PERP · USD settled</div>
+    <div class="mid" id="cd-mid">—</div>
+    <dl>
+      <dt>bid</dt><dd id="cd-bid">—</dd>
+      <dt>ask</dt><dd id="cd-ask">—</dd>
+      <dt>funding</dt><dd id="cd-fund">—</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="rows">
+  <div class="row">
+    <div><div class="k">Gross spread</div><div class="d">mid to mid, before costs</div></div>
+    <div class="v" id="gross">—</div>
+  </div>
+  <div class="row">
+    <div><div class="k">Buy Bybit, sell Crypto.com</div><div class="d">crossable prices, net of fees</div></div>
+    <div class="v" id="rA">—</div>
+  </div>
+  <div class="row">
+    <div><div class="k">Buy Crypto.com, sell Bybit</div><div class="d">crossable prices, net of fees</div></div>
+    <div class="v" id="rB">—</div>
+  </div>
+  <div class="row">
+    <div><div class="k">USDT/USD</div><div class="d">FX contamination in the raw gap</div></div>
+    <div class="v" id="fx">—</div>
+  </div>
+  <div class="row">
+    <div><div class="k">Funding differential</div><div class="d">delta-neutral carry, annualised</div></div>
+    <div class="v" id="carry">—</div>
+  </div>
+  <div class="row">
+    <div><div class="k">Windows seen</div><div class="d">ticks where net edge cleared zero</div></div>
+    <div class="v" id="hits">0 / 0</div>
+  </div>
+</div>
+
+<div class="fees">
+  <label>Bybit taker fee %<input id="feeBy" type="number" step="0.001" value="0.055"></label>
+  <label>Crypto.com taker fee %<input id="feeCd" type="number" step="0.001" value="0.050"></label>
+  <label>Adjust for USDT/USD<input id="useFx" type="checkbox" checked style="width:auto"></label>
+</div>
+
+<footer><span id="stamp">—</span><span id="best">session best —</span></footer>
+<div id="err"></div>
+
+<script>
+"use strict";
+
+/* Set WORKER to your Cloudflare Worker URL. Crypto.com and Kraken both
+   need the proxy; Bybit's public API allows browser requests directly. */
+const WORKER = "";
+const REFRESH_MS = 4000;
+
+const BYBIT = "https://api.bybit.com/v5/market/tickers?category=linear&symbol=BTCUSDT";
+
+let ticks = 0, hits = 0, sessionBest = -Infinity;
+const $ = id => document.getElementById(id);
+const bps = x => (x * 10000);
+const fmt = n => n.toLocaleString("en-US",{minimumFractionDigits:1,maximumFractionDigits:1});
+
+async function jget(url){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+}
+
+async function getBybit(){
+  const j = await jget(WORKER ? `${WORKER}/bybit/ticker` : BYBIT);
+  const d = j.result && j.result.list && j.result.list[0];
+  if(!d) throw new Error("bybit: empty ticker");
+  return {
+    bid:+d.bid1Price, ask:+d.ask1Price,
+    funding:+d.fundingRate,
+    nextFunding:+d.nextFundingTime
+  };
+}
+
+async function getCryptoCom(){
+  if(!WORKER) return null;                       // no CORS without the proxy
+  const j = await jget(`${WORKER}/cdc/ticker`);
+  const d = j.result && j.result.data && j.result.data[0];
+  if(!d) throw new Error("crypto.com: empty ticker");
+  return {
+    bid:+d.b, ask:+d.k,
+    funding: j.funding !== undefined && j.funding !== null ? +j.funding : null
+  };
+}
+
+async function getFx(){
+  if(!WORKER) return null;
+  try{
+    const j = await jget(`${WORKER}/fx/usdt`);
+    return j.rate ? +j.rate : null;
+  }catch{ return null; }
+}
+
+/* Buy at the ask, sell at the bid. Mids would invent an edge that
+   cannot actually be traded. */
+function routes(by, cd, feeBy, feeCd){
+  const aIn = by.ask*(1+feeBy), aOut = cd.bid*(1-feeCd);
+  const bIn = cd.ask*(1+feeCd), bOut = by.bid*(1-feeBy);
+  return { A:(aOut-aIn)/aIn, B:(bOut-bIn)/bIn };
+}
+
+function paint(id, v, unit="bps"){
+  const el = $(id);
+  el.textContent = `${v>=0?"+":""}${v.toFixed(2)} ${unit}`;
+  el.className = `v ${v>0?"pos":v<0?"neg":"neu"}`;
+}
+
+async function tick(){
+  try{
+    const feeBy = (+$("feeBy").value||0)/100;
+    const feeCd = (+$("feeCd").value||0)/100;
+
+    const [by, cdRaw, fx] = await Promise.all([getBybit(), getCryptoCom(), getFx()]);
+
+    $("by-bid").textContent = fmt(by.bid);
+    $("by-ask").textContent = fmt(by.ask);
+    $("by-mid").textContent = fmt((by.bid+by.ask)/2);
+    $("by-fund").textContent = (by.funding*100).toFixed(4)+"%";
+
+    if(!cdRaw){
+      $("err").innerHTML = `<div class="err">Crypto.com feed needs the Worker proxy. Set WORKER at the top of this file.</div>`;
+      $("route").textContent = "Bybit only — no spread to compute";
+      return;
+    }
+
+    // Crypto.com quotes USD. Convert to USDT terms so the two legs
+    // are actually comparable.
+    const useFx = $("useFx").checked && fx;
+    const cd = useFx
+      ? { bid: cdRaw.bid/fx, ask: cdRaw.ask/fx, funding: cdRaw.funding }
+      : cdRaw;
+
+    $("cd-bid").textContent = fmt(cdRaw.bid);
+    $("cd-ask").textContent = fmt(cdRaw.ask);
+    $("cd-mid").textContent = fmt((cdRaw.bid+cdRaw.ask)/2);
+    $("cd-fund").textContent = cdRaw.funding!=null ? (cdRaw.funding*100).toFixed(4)+"%" : "n/a";
+
+    const mb=(by.bid+by.ask)/2, mc=(cd.bid+cd.ask)/2;
+    const gross=(mc-mb)/mb;
+    paint("gross", bps(gross));
+
+    const r = routes(by, cd, feeBy, feeCd);
+    paint("rA", bps(r.A));
+    paint("rB", bps(r.B));
+
+    const best = Math.max(r.A, r.B);
+    const bestBps = bps(best);
+    $("net").textContent = `${bestBps>=0?"+":""}${bestBps.toFixed(2)}`;
+    $("edge").style.setProperty("--tone", best>0?"var(--live)":"var(--dead)");
+    $("route").textContent = best<=0
+      ? "no tradable edge — spread inside costs"
+      : (r.A>r.B ? "buy Bybit, sell Crypto.com" : "buy Crypto.com, sell Bybit");
+
+    $("fx").textContent = fx ? fx.toFixed(5) : "unavailable";
+    $("fx").className = "v " + (fx ? (Math.abs(fx-1)>0.0005?"neg":"neu") : "neu");
+
+    if(cd.funding!=null){
+      const per = by.funding - cd.funding;
+      const ann = per*3*365*100;
+      $("carry").textContent = `${bps(per).toFixed(2)} bps · ${ann>=0?"+":""}${ann.toFixed(1)}%/yr`;
+      $("carry").className = "v " + (Math.abs(ann)>10?"pos":"neu");
+    } else {
+      $("carry").textContent = "n/a";
+    }
+
+    ticks++; if(best>0) hits++;
+    if(bestBps>sessionBest) sessionBest=bestBps;
+    $("hits").textContent = `${hits} / ${ticks}`;
+    $("hits").className = "v " + (hits?"pos":"neg");
+    $("best").textContent = `session best ${sessionBest.toFixed(2)} bps`;
+    $("stamp").textContent = new Date().toTimeString().slice(0,8);
+    $("clock").textContent = `${ticks} ticks`;
+    $("err").innerHTML = "";
+  }catch(e){
+    $("err").innerHTML = `<div class="err">Feed stalled: ${e.message}. Retrying.</div>`;
+  }
+}
+
+tick();
+setInterval(tick, REFRESH_MS);
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") tick(); });
+</script>
+</body>
+</html>
