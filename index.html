@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>STRAIT</title>
+<style>
+  :root{
+    --bg:#07090c;--panel:#0d1116;--edge:#1b232c;--ink:#e6edf3;--dim:#6b7c8d;
+    --live:#3fd18b;--dead:#f0525f;--warn:#c8a24a;--wire:#2a3541;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink)}
+  body{font:400 15px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;
+    padding:env(safe-area-inset-top) 14px calc(28px + env(safe-area-inset-bottom));
+    max-width:560px;margin:0 auto}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 0 3px}
+  .mark{font-size:13px;letter-spacing:.34em;color:var(--dim)}
+  .conns{display:flex;gap:6px;align-items:center}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--wire)}
+  .dot.on{background:var(--live)}
+  .dot.off{background:var(--dead)}
+  .dot.wait{background:var(--warn)}
+  .sub{font-size:11px;color:var(--dim);padding-bottom:16px}
+
+  .edge{border:1px solid var(--edge);border-radius:5px;background:var(--panel);
+    padding:20px;text-align:center;position:relative;overflow:hidden}
+  .edge::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--tone,var(--wire))}
+  .edge .n{font-size:38px;font-weight:600;letter-spacing:-.02em;color:var(--tone,var(--dim));line-height:1}
+  .edge .u{font-size:15px;color:var(--dim);margin-left:5px}
+  .edge .route{margin-top:9px;font-size:13px;color:var(--dim)}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .venue{border:1px solid var(--edge);border-radius:5px;background:var(--panel);padding:14px}
+  .venue h3{margin:0 0 3px;font-size:12px;font-weight:400;color:var(--dim);letter-spacing:.06em}
+  .venue .inst{font-size:10px;color:var(--wire);margin-bottom:9px}
+  .venue .mid{font-size:20px;font-weight:600;letter-spacing:-.01em}
+  .venue dl{margin:8px 0 0;font-size:11px;color:var(--dim);display:grid;grid-template-columns:auto 1fr;gap:2px 8px}
+  .venue dd{margin:0;text-align:right;color:var(--ink)}
+  .venue dt{margin:0}
+  .venue .st{margin-top:9px;font-size:10px;color:var(--dim);border-top:1px solid var(--edge);padding-top:7px}
+  .venue .st.on{color:var(--live)}
+  .venue .st.off{color:var(--dead)}
+  .venue .st.wait{color:var(--warn)}
+
+  .rows{margin-top:12px;border:1px solid var(--edge);border-radius:5px;background:var(--panel)}
+  .row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    padding:14px 16px;border-bottom:1px solid var(--edge)}
+  .row:last-child{border-bottom:0}
+  .row .k{font-size:13px}
+  .row .d{font-size:11px;color:var(--dim);margin-top:3px}
+  .row .v{font-size:14px;text-align:right;white-space:nowrap}
+  .pos{color:var(--live)}.neg{color:var(--dead)}.neu{color:var(--warn)}
+
+  .fees{margin-top:12px;border:1px solid var(--edge);border-radius:5px;background:var(--panel);padding:14px 16px}
+  .fees label{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px;color:var(--dim);padding:5px 0}
+  .fees input[type=text]{background:#121820;border:1px solid var(--edge);color:var(--ink);
+    font:inherit;font-size:13px;width:88px;padding:5px 8px;border-radius:3px;text-align:right}
+  .fees input:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+  .fees .bad{border-color:var(--dead)}
+
+  footer{display:flex;justify-content:space-between;margin-top:16px;font-size:11px;color:var(--dim)}
+  .note{margin-top:12px;padding:11px 14px;border:1px solid var(--edge);border-radius:5px;
+    font-size:11px;color:var(--dim);line-height:1.5;white-space:pre-line}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="mark">STRAIT</div>
+  <div class="conns">
+    <i class="dot" id="d-bybit" title="Bybit"></i>
+    <i class="dot" id="d-cdc" title="Crypto.com"></i>
+    <i class="dot" id="d-fx" title="Coinbase USDT-USD"></i>
+  </div>
+</header>
+<div class="sub">Bybit BTCUSDT.P vs Crypto.com BTCUSD-PERP · live websockets</div>
+
+<div class="edge" id="edge">
+  <div><span class="n" id="net">—</span><span class="u">bps</span></div>
+  <div class="route" id="route">connecting</div>
+</div>
+
+<div class="grid">
+  <div class="venue">
+    <h3>Bybit</h3><div class="inst">BTCUSDT · USDT settled</div>
+    <div class="mid" id="by-mid">—</div>
+    <dl>
+      <dt>bid</dt><dd id="by-bid">—</dd>
+      <dt>ask</dt><dd id="by-ask">—</dd>
+      <dt>funding</dt><dd id="by-fund">—</dd>
+    </dl>
+    <div class="st" id="by-st">idle</div>
+  </div>
+  <div class="venue">
+    <h3>Crypto.com</h3><div class="inst">BTCUSD-PERP · USD settled</div>
+    <div class="mid" id="cd-mid">—</div>
+    <dl>
+      <dt>bid</dt><dd id="cd-bid">—</dd>
+      <dt>ask</dt><dd id="cd-ask">—</dd>
+      <dt>funding</dt><dd id="cd-fund">—</dd>
+    </dl>
+    <div class="st" id="cd-st">idle</div>
+  </div>
+</div>
+
+<div class="rows">
+  <div class="row">
+    <div><div class="k">Gross spread</div><div class="d">mid to mid, before costs</div></div>
+    <div class="v" id="gross">—</div>
+  </div>
+  <div class="row">
+    <div><div class="k">Buy Bybit, sell Crypto.com</div><div class="d">crossable prices, net of fees</div></div>
+    <div class="v" id="rA">—</div>
+  </div>
+  <div class="row">
+    <div><div class="k">Buy Crypto.com, sell Bybit</div><div class="d">crossable prices, net of fees</div></div>
+    <div class="v" id="rB">—</div>
+  </div>
+  <div class="row">
+    <div><div class="k">USDT/USD</div><div class="d" id="fx-note">FX contamination in the raw gap</div></div>
+    <div class="v" id="fx">—</div>
+  </div>
+  <div class="row">
+    <div><div class="k">Funding differential</div><div class="d">Bybit 8h vs Crypto.com 1h, annualised</div></div>
+    <div class="v" id="carry">—</div>
+  </div>
+  <div class="row">
+    <div><div class="k">Windows seen</div><div class="d">ticks where net edge cleared zero</div></div>
+    <div class="v" id="hits">0 / 0</div>
+  </div>
+</div>
+
+<div class="fees">
+  <label>Bybit taker fee %<input id="feeBy" type="text" inputmode="decimal" value="0.055"></label>
+  <label>Crypto.com taker fee %<input id="feeCd" type="text" inputmode="decimal" value="0.050"></label>
+  <label>Adjust for USDT/USD<input id="useFx" type="checkbox" checked style="width:auto"></label>
+</div>
+
+<div class="note" id="diag">Opening sockets.</div>
+<footer><span id="stamp">—</span><span id="best">session best —</span></footer>
+
+<script>
+"use strict";
+
+/* Three public market-data websockets. No keys, no proxy, no backend.
+   WebSocket handshakes are exempt from CORS, which is why this works
+   from a static page where fetch() would be blocked. */
+const URLS = {
+  bybit: "wss://stream.bybit.com/v5/public/linear",
+  cdc:   "wss://stream.crypto.com/exchange/v1/market",
+  fx:    "wss://ws-feed.exchange.coinbase.com",
+};
+const SYM = { bybit:"BTCUSDT", cdc:"BTCUSD-PERP", fx:"USDT-USD" };
+
+/* Funding intervals differ per venue: Bybit settles every 8h, Crypto.com
+   every hour. Annualising both with the same multiplier is wrong by 8x. */
+const FUND_HOURS = { bybit:8, cdc:1 };
+
+const STALE_MS = 20000;
+
+const $ = id => document.getElementById(id);
+const bps = x => x*10000;
+const fmt = n => n.toLocaleString("en-US",{minimumFractionDigits:1,maximumFractionDigits:1});
+const setText = (id, t) => { const el = $(id); if(el) el.textContent = t; };
+
+/* Accepts 0.055 or 0,055 — iOS keyboards in a Turkish locale emit the comma. */
+function num(v, fallback=0){
+  if(typeof v === "number") return v;
+  const n = parseFloat(String(v).replace(",", "."));
+  return isFinite(n) ? n : fallback;
+}
+
+const state = {
+  by:{bid:null,ask:null,funding:null},
+  cd:{bid:null,ask:null,funding:null},
+  fx:null,
+  seen:{bybit:0,cdc:0,fx:0},
+  status:{bybit:"idle",cdc:"idle",fx:"idle"},
+  ticks:0, hits:0, best:-Infinity,
+};
+
+/* Status is reported per feed. A shared "connecting" line hides which
+   socket died, which is exactly the failure this tool had. */
+const STATUS_EL = { bybit:"by-st", cdc:"cd-st" };
+function status(feed, cls, text){
+  state.status[feed] = cls;
+  const dot = $("d-" + feed);
+  if(dot) dot.className = "dot " + (cls === "live" ? "on" : cls === "down" ? "off" : "wait");
+  const el = $(STATUS_EL[feed]);
+  if(el){
+    el.textContent = text;
+    el.className = "st " + (cls === "live" ? "on" : cls === "down" ? "off" : "wait");
+  }
+  diag();
+}
+
+function diag(){
+  const line = f => `${f}: ${state.status[f]}`;
+  setText("diag", [
+    line("bybit") + "  ·  " + line("cdc") + "  ·  " + line("fx"),
+    state.status.fx !== "live"
+      ? "USDT/USD feed unavailable — spreads shown are NOT FX-adjusted."
+      : ""
+  ].filter(Boolean).join("\n"));
+}
+
+/* ── connection helper: backoff reconnect, per-feed status ─────── */
+function connect(feed, url, { onOpen, onMessage }){
+  let ws = null, retry = 0, pending = null;
+
+  function open(){
+    status(feed, "wait", "connecting");
+    try { ws = new WebSocket(url); }
+    catch(e){ status(feed, "down", "blocked: " + e.message); return schedule(); }
+
+    ws.onopen = () => {
+      retry = 0;
+      status(feed, "wait", "subscribing");
+      // Crypto.com rate-limits per calendar second of connection;
+      // their docs ask for a 1s pause before the first request.
+      setTimeout(() => {
+        try { onOpen(ws); }
+        catch(e){ status(feed, "down", "subscribe failed"); }
+      }, feed === "cdc" ? 1100 : 0);
+    };
+    ws.onmessage = ev => {
+      let m; try{ m = JSON.parse(ev.data); }catch(e){ return; }
+      try{ onMessage(m, ws); }catch(e){ /* one bad frame must not kill the feed */ }
+    };
+    ws.onclose = ev => {
+      status(feed, "down", `closed (${ev.code||"?"}) — retrying`);
+      schedule();
+    };
+    ws.onerror = () => { try{ ws.close(); }catch(e){} };
+  }
+
+  function schedule(){
+    if(pending) return;                       // never stack reconnect timers
+    const wait = Math.min(30000, 1000 * Math.pow(2, retry++));
+    pending = setTimeout(() => { pending = null; open(); }, wait);
+  }
+
+  open();
+}
+
+/* Each feed is started independently. A throw in one must not stop the
+   others from ever being constructed. */
+function boot(feed, url, handlers){
+  try { connect(feed, url, handlers); }
+  catch(e){ status(feed, "down", "init error: " + e.message); }
+}
+
+/* ── Bybit: snapshot then deltas carrying only changed fields ─── */
+let byRaw = {};
+boot("bybit", URLS.bybit, {
+  onOpen: ws => ws.send(JSON.stringify({ op:"subscribe", args:[`tickers.${SYM.bybit}`] })),
+  onMessage: m => {
+    if(m.op === "subscribe"){
+      status("bybit", m.success ? "live" : "down", m.success ? "subscribed" : (m.ret_msg||"rejected"));
+      return;
+    }
+    if(!m.topic || !m.topic.startsWith("tickers.")) return;
+    byRaw = m.type === "snapshot" ? { ...m.data } : { ...byRaw, ...m.data };
+    if(byRaw.bid1Price == null || byRaw.ask1Price == null) return;
+    state.by.bid = +byRaw.bid1Price;
+    state.by.ask = +byRaw.ask1Price;
+    if(byRaw.fundingRate != null) state.by.funding = +byRaw.fundingRate;
+    state.seen.bybit = Date.now();
+    if(state.status.bybit !== "live") status("bybit", "live", "streaming");
+    render();
+  },
+});
+
+/* ── Crypto.com: heartbeat must be answered or the socket drops ─ */
+boot("cdc", URLS.cdc, {
+  onOpen: ws => {
+    ws.send(JSON.stringify({ id:1, method:"subscribe", nonce:Date.now(),
+      params:{ channels:[`ticker.${SYM.cdc}`] } }));
+    setTimeout(() => { try{ ws.send(JSON.stringify({ id:2, method:"subscribe", nonce:Date.now(),
+      params:{ channels:[`funding.${SYM.cdc}`, `estimatedfunding.${SYM.cdc}`] } })); }catch(e){} }, 400);
+  },
+  onMessage: (m, ws) => {
+    if(m.method === "public/heartbeat"){
+      // same id, within 5 seconds, or the connection is closed on us
+      ws.send(JSON.stringify({ id:m.id, method:"public/respond-heartbeat" }));
+      return;
+    }
+    // Surface rejected subscriptions instead of waiting forever on silence.
+    if(m.method === "subscribe" && m.code != null && m.code !== 0){
+      status("cdc", "down", `subscribe error ${m.code}`);
+      return;
+    }
+    const r = m.result;
+    if(!r || !Array.isArray(r.data) || !r.data.length) return;
+    const d = r.data[0];
+    if(r.channel === "ticker"){
+      if(d.b == null || d.k == null) return;
+      state.cd.bid = +d.b; state.cd.ask = +d.k;
+      state.seen.cdc = Date.now();
+      if(state.status.cdc !== "live") status("cdc", "live", "streaming");
+      render();
+    } else if(r.channel === "funding" || r.channel === "estimatedfunding"){
+      const v = d.v != null ? +d.v : (d.f != null ? +d.f : null);
+      if(v != null && isFinite(v)){ state.cd.funding = v; render(); }
+    }
+  },
+});
+
+/* ── Coinbase: USDT priced in USD, the leg that makes them compare ── */
+boot("fx", URLS.fx, {
+  onOpen: ws => ws.send(JSON.stringify({
+    type:"subscribe", product_ids:[SYM.fx], channels:["ticker"] })),
+  onMessage: m => {
+    if(m.type === "error"){ status("fx", "down", m.message || "rejected"); return; }
+    if(m.type !== "ticker" || m.product_id !== SYM.fx) return;
+    const p = +m.price;
+    if(isFinite(p) && p > 0){
+      state.fx = p;
+      state.seen.fx = Date.now();
+      if(state.status.fx !== "live") status("fx", "live", "streaming");
+      render();
+    }
+  },
+});
+
+/* A socket can stay open and stop delivering. Mark that rather than
+   pricing off a frozen book. */
+setInterval(() => {
+  let changed = false;
+  ["bybit","cdc","fx"].forEach(f => {
+    if(state.status[f] === "live" && Date.now() - state.seen[f] > STALE_MS){
+      status(f, "wait", "stale — no ticks");
+      changed = true;
+    }
+  });
+  if(changed) render();
+}, 3000);
+
+/* ── maths ─────────────────────────────────────────────────────── */
+function routes(by, cd, feeBy, feeCd){
+  const aIn = by.ask*(1+feeBy), aOut = cd.bid*(1-feeCd);
+  const bIn = cd.ask*(1+feeCd), bOut = by.bid*(1-feeBy);
+  return { A:(aOut-aIn)/aIn, B:(bOut-bIn)/bIn };
+}
+function paint(id, v){
+  const el = $(id);
+  if(!el) return;
+  el.textContent = `${v>=0?"+":""}${v.toFixed(2)} bps`;
+  el.className = `v ${v>0?"pos":v<0?"neg":"neu"}`;
+}
+const annual = (rate, hours) => rate * (24/hours) * 365 * 100;
+
+/* Throttle without dropping: a burst schedules a trailing repaint so the
+   last tick always lands. */
+let lastRender = 0, trailing = null;
+function render(){
+  const now = Date.now();
+  if(now - lastRender < 250){
+    if(!trailing) trailing = setTimeout(() => { trailing = null; render(); }, 250);
+    return;
+  }
+  lastRender = now;
+
+  const by = state.by, cdRaw = state.cd;
+
+  if(by.bid){
+    setText("by-bid", fmt(by.bid));
+    setText("by-ask", fmt(by.ask));
+    setText("by-mid", fmt((by.bid+by.ask)/2));
+    setText("by-fund", by.funding!=null ? (by.funding*100).toFixed(4)+"% /8h" : "—");
+  }
+  if(cdRaw.bid){
+    setText("cd-bid", fmt(cdRaw.bid));
+    setText("cd-ask", fmt(cdRaw.ask));
+    setText("cd-mid", fmt((cdRaw.bid+cdRaw.ask)/2));
+    setText("cd-fund", cdRaw.funding!=null ? (cdRaw.funding*100).toFixed(4)+"% /1h" : "n/a");
+  }
+  setText("fx", state.fx ? state.fx.toFixed(5) : "—");
+  const fxEl = $("fx");
+  if(fxEl) fxEl.className = "v " + (!state.fx ? "neg" : Math.abs(state.fx-1)>0.0005 ? "neg" : "neu");
+
+  // Only the two books gate the edge. The FX leg degrades to "unadjusted"
+  // rather than blanking the tool, since Coinbase is reachable less often.
+  if(!by.bid || !cdRaw.bid){
+    const missing = [!by.bid && "Bybit", !cdRaw.bid && "Crypto.com"].filter(Boolean);
+    setText("route", `waiting on ${missing.join(" + ")}`);
+    return;
+  }
+
+  // Fee inputs: flag unparseable values rather than silently reading zero,
+  // which would make every spread look profitable.
+  const rawBy = $("feeBy").value, rawCd = $("feeCd").value;
+  const okBy = isFinite(parseFloat(String(rawBy).replace(",", ".")));
+  const okCd = isFinite(parseFloat(String(rawCd).replace(",", ".")));
+  $("feeBy").classList.toggle("bad", !okBy);
+  $("feeCd").classList.toggle("bad", !okCd);
+  const feeBy = num(rawBy, 0.055)/100;
+  const feeCd = num(rawCd, 0.050)/100;
+
+  const wantFx = $("useFx").checked;
+  const fxOn = wantFx && !!state.fx;
+  setText("fx-note", !state.fx
+    ? "feed down — spreads not FX-adjusted"
+    : wantFx ? "applied to Crypto.com prices" : "FX contamination in the raw gap");
+
+  const cd = fxOn
+    ? { bid: cdRaw.bid/state.fx, ask: cdRaw.ask/state.fx, funding: cdRaw.funding }
+    : cdRaw;
+
+  const mb=(by.bid+by.ask)/2, mc=(cd.bid+cd.ask)/2;
+  paint("gross", bps((mc-mb)/mb));
+
+  const r = routes(by, cd, feeBy, feeCd);
+  paint("rA", bps(r.A));
+  paint("rB", bps(r.B));
+
+  const best = Math.max(r.A, r.B), bestBps = bps(best);
+  setText("net", `${bestBps>=0?"+":""}${bestBps.toFixed(2)}`);
+  $("edge").style.setProperty("--tone", best>0 ? "var(--live)" : "var(--dead)");
+  const stale = ["bybit","cdc"].some(f => state.status[f] !== "live");
+  setText("route", stale
+    ? "book stale — figures may be frozen"
+    : best<=0
+      ? "no tradable edge — spread inside costs"
+      : (r.A>r.B ? "buy Bybit, sell Crypto.com" : "buy Crypto.com, sell Bybit")
+      + (wantFx && !state.fx ? " (FX unadjusted)" : ""));
+
+  if(cd.funding!=null && by.funding!=null){
+    const annBy = annual(by.funding, FUND_HOURS.bybit);
+    const annCd = annual(cd.funding, FUND_HOURS.cdc);
+    const net = annBy - annCd;
+    const el = $("carry");
+    el.textContent = `${net>=0?"+":""}${net.toFixed(1)}%/yr`;
+    el.className = "v " + (Math.abs(net)>10 ? "pos" : "neu");
+  } else {
+    setText("carry", "n/a");
+  }
+
+  state.ticks++; if(best>0) state.hits++;
+  if(bestBps>state.best) state.best = bestBps;
+  setText("hits", `${state.hits} / ${state.ticks}`);
+  $("hits").className = "v " + (state.hits ? "pos" : "neg");
+  setText("best", `session best ${state.best.toFixed(2)} bps`);
+  setText("stamp", new Date().toTimeString().slice(0,8));
+}
+
+["feeBy","feeCd","useFx"].forEach(id => $(id).addEventListener("input", () => { lastRender = 0; render(); }));
+diag();
+</script>
+</body>
+</html>
